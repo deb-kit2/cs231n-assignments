@@ -141,9 +141,26 @@ class CaptioningRNN(object):
         # in your implementation, if needed.                                       #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        h0, c_affine = affine_forward(features, W_proj, b_proj)
+        x, c_wordembed = word_embedding_forward(captions_in, W_embed)
 
-        pass
+        if self.cell_type == "rnn":
+          h, c_rnn = rnn_forward(x, h0, Wx, Wh, b)
+        
+        out, c_taffine = temporal_affine_forward(h, W_vocab, b_vocab)
+        loss, dout = temporal_softmax_loss(out, captions_out, mask)
 
+        #########
+        dh, dW_vocab, db_vocab = temporal_affine_backward(dout, c_taffine)
+        
+        if self.cell_type == "rnn":
+          dx, dh0, dWx, dWh, db = rnn_backward(dh, c_rnn)
+
+        dW_embed = word_embedding_backward(dx, c_wordembed)
+        _, dW_proj, db_proj = affine_backward(dh0, c_affine)
+
+        grads = {"W_vocab" : dW_vocab, "b_vocab" : db_vocab, "Wx" : dWx, "b" : db,
+                 "W_proj" : dW_proj, "b_proj" : db_proj, "Wh" : dWh, "W_embed" : dW_embed}
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -210,9 +227,17 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-        pass
-
+        h0, _ = affine_forward(features, W_proj, b_proj)
+        
+        for i in range(max_length):
+          word, _ = word_embedding_forward(captions[:,i].reshape(N, -1), W_embed)
+          word = word.reshape(N, -1)
+          if self.cell_type == "rnn":
+            h0, _ = rnn_step_forward(word, h0, Wx, Wh, b)
+          
+          word = np.dot(h0, W_vocab) + b_vocab
+          word = word.argmax(axis = 1)
+          captions[:, i] = word
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
